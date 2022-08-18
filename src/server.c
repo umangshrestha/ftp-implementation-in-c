@@ -21,11 +21,11 @@ static Log *log;
 static int is_running = 1;
 static int sockfd; // socket file descriptor
 
-
-
-char* lowercase(char* s) {
-  for(char *p=s; *p; p++) *p=tolower(*p);
-  return s;
+char *lowercase(char *s)
+{
+    for (char *p = s; *p; p++)
+        *p = tolower(*p);
+    return s;
 }
 
 void send_response(int connfd, const char *buffer)
@@ -104,6 +104,7 @@ void cmd_rnfr(int connfd, const char *from)
     log->debugf("cmd: RNFR\n");
     if (from == NULL)
         return send_response(connfd, STATUS_SYNTAX_ERROR);
+
     send_response(connfd, STATUS_COMMAND_OK);
     //  after rnfr, rntr should be called immediately
     char buffer[BUFFER_SIZE];
@@ -111,10 +112,10 @@ void cmd_rnfr(int connfd, const char *from)
     read(connfd, buffer, BUFFER_SIZE);
     const char *token = strtok(buffer, DELIMITER);
     const char *to = strtok(NULL, DELIMITER);
-    if (strncmp("rnto", token, 4) == 0)
-        cmd_rnto(connfd, from, to);
-    else
-        send_response(connfd, STATUS_INVALID_SEQUENCE);
+    if (strncmp("rnto", token, 4) != 0)
+        return send_response(connfd, STATUS_INVALID_SEQUENCE);
+    
+    cmd_rnto(connfd, from, to);
 }
 
 void cmd_rein(int connfd, const char *buffer)
@@ -177,9 +178,11 @@ void cmd_port(int connfd, const char *buffer, char *named_pipe)
     log->debugf("cmd: PORT\n");
     if (buffer == NULL)
         return send_response(connfd, STATUS_SYNTAX_ERROR);
+    
     unlink(buffer);
     if (mkfifo(buffer, 0666) != 0)
         return send_response(connfd, STATUS_CANT_OPEN_CONNECTION);
+    
     chmod(buffer, 0666);
     bzero(named_pipe, BUFFER_SIZE);
     strcpy(named_pipe, buffer);
@@ -217,6 +220,7 @@ void cmd_stor(int connfd, const char *to, const char *from)
     send_response(connfd, STATUS_CONNECTION_ALREADY_OPEN);
     if (copy_data(readfd, writefd) == -1)
         send_response(connfd, STATUS_CANT_WRITE_TO_FILE);
+    
     close(readfd);
     close(writefd);
     send_response(connfd, STATUS_COMMAND_OK);
@@ -240,6 +244,7 @@ void cmd_appe(int connfd, const char *to, const char *from)
     send_response(connfd, STATUS_CONNECTION_ALREADY_OPEN);
     if (copy_data(readfd, writefd) == -1)
         send_response(connfd, STATUS_CANT_WRITE_TO_FILE);
+    
     close(readfd);
     close(writefd);
     send_response(connfd, STATUS_COMMAND_OK);
@@ -251,6 +256,7 @@ void cmd_dele(int connfd, const char *filename)
     log->debugf("cmd: DELE\n");
     if (filename == NULL)
         return send_response(connfd, STATUS_SYNTAX_ERROR);
+    
     const char *response =
         (remove(filename) == 0) ? STATUS_FILE_ACTION_OK : STATUS_NO_SUCH_FILE_IN_DIRECTORY;
     send_response(connfd, response);
@@ -269,6 +275,7 @@ void *server_process(void *fd)
     int connfd = *((int *)fd);
     char buffer[BUFFER_SIZE];
     char named_pipe[BUFFER_SIZE];
+    
     while (is_running && !quit)
     {
         bzero(buffer, sizeof(buffer));
@@ -367,7 +374,6 @@ int main(int argc, char **argv)
     log->debugf("initialize socket\n");
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = SERVER_PORT;
-
     // preventing binding issue
     if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt)) < 0)
     {
